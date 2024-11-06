@@ -1,7 +1,7 @@
 export type signup_request_type = {
   email: string;
   password: string;
-  role: "Agent" | "Registered";
+  role: "Agent" | "Registered" | "Guest";
 };
 
 export type security_questions_type = {

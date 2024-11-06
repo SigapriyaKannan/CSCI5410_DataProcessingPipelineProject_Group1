@@ -21,10 +21,12 @@ import {
 } from "@/components/ui/select";
 import { auth_api } from "@/lib/constants";
 import { security_questions_type, signup_request_type } from "../types/auth";
-import { redirect, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
+import { toast } from "@/hooks/use-toast";
 
 export default function SignupPage() {
   const [step, setStep] = useState(1);
+  const [loading, setLoading] = useState(false);
   const [formData, setFormData] = useState({
     email: "",
     password: "",
@@ -38,180 +40,186 @@ export default function SignupPage() {
   });
   const [mathOperand1, setMathOperand1] = useState(0);
   const [mathOperand2, setMathOperand2] = useState(0);
-  const [operand, setOperand] = useState("/");
-  const [answerToBe, setAnswerToBe] = useState(-1);
+  const [operand, setOperand] = useState("");
+  const [answerToBe, setAnswerToBe] = useState(0);
   const [error, setError] = useState("");
 
   const router = useRouter();
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const handleSelectChange = (value: string) => {
-    setFormData({ ...formData, role: value });
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement> | string,
+    name?: string,
+  ) => {
+    if (typeof e === "string" && name) {
+      setFormData((prevData) => ({ ...prevData, [name]: e }));
+    } else if (typeof e !== "string") {
+      const target = e.target as HTMLInputElement;
+      setFormData((prevData) => ({ ...prevData, [target.name]: target.value }));
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
+    setLoading(true);
 
     try {
       if (step === 1) {
         if (formData.password !== formData.confirmPassword) {
-          setError("Passwords do not match");
+          setError("Passwords do not match.");
+          setLoading(false);
           return;
         }
-        if (formData.role !== "Agent" && formData.role !== "Registered") {
-          setError("Please choose a correct role");
+        if (
+          formData.role !== "Registered" &&
+          formData.role !== "Agent" &&
+          formData.role !== "Guest"
+        ) {
+          setError("Please choose a correct role.");
+          setLoading(false);
           return;
         }
-        // TODO: Implement AWS Cognito user creation
-        console.log(
-          "Creating user with api:",
-          formData.email,
-          formData.role,
-          formData.password,
-        );
 
-        try {
-          const signupRequestData: signup_request_type = {
-            email: formData.email,
-            password: formData.password,
-            role: formData.role,
-          };
+        const signupRequestData: signup_request_type = {
+          email: formData.email,
+          password: formData.password,
+          role: formData.role,
+        };
 
-          const response = await fetch(auth_api + "/api/signup", {
+        const response = await fetch(`${auth_api}/api/signup`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(signupRequestData),
+        });
+
+        if (!response.ok) {
+          const result = await response.json();
+          setError(result.error || "Signup failed.");
+          setLoading(false);
+          toast({
+            title: "Signup failed",
+            description: result?.message,
+          });
+          return;
+        }
+
+        toast({
+          title: "Registration success",
+          description: "Make sure to remember the password",
+        });
+        setStep(2);
+      } else if (step === 2) {
+        const securityQuestionsRequestData: security_questions_type = {
+          email: formData.email,
+          securityQuestion1: formData.securityQuestion1,
+          securityAnswer1: formData.securityAnswer1,
+          securityQuestion2: formData.securityQuestion2,
+          securityAnswer2: formData.securityAnswer2,
+        };
+
+        const response = await fetch(
+          `${auth_api}/api/signup/securityquestions`,
+          {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
             },
-            body: JSON.stringify(signupRequestData),
-          });
-
-          const result = await response.json();
-
-          if (result?.status === "Success") {
-            console.log("signup success", result);
-            setError("");
-            setStep(2);
-          } else {
-            console.log("signup fail", result);
-            setError(result.error || "Signup failed.");
-          }
-        } catch (err) {
-          setError("An error occurred. Please try again.");
-        }
-      } else if (step === 2) {
-        // TODO: Implement DynamoDB security question storage
-        console.log(
-          formData.email,
-          formData.securityQuestion1,
-          formData.securityAnswer1,
-          formData.securityQuestion2,
-          formData.securityAnswer2,
+            body: JSON.stringify(securityQuestionsRequestData),
+          },
         );
 
-        try {
-          const securityQuestionsRequestData: security_questions_type = {
-            email: formData.email,
-            securityQuestion1: formData.securityQuestion1,
-            securityAnswer1: formData.securityAnswer1,
-            securityQuestion2: formData.securityQuestion2,
-            securityAnswer2: formData.securityAnswer2,
-          };
-
-          const response = await fetch(
-            auth_api + "/api/signup/securityquestions",
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(securityQuestionsRequestData),
-            },
-          );
-
+        if (!response.ok) {
           const result = await response.json();
-
-          if (result?.status === "Success") {
-            console.log("signup success", result);
-            setError("");
-            try {
-              const math_response = await fetch(auth_api + "/api/mathskill", {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({ email: formData.email }),
-              });
-
-              const math_result = await math_response.json();
-
-              if (math_result?.status === "Success") {
-                setMathOperand1(math_result.operands[0]);
-                setMathOperand2(math_result.operands[1]);
-                setAnswerToBe(math_result.answer);
-
-                if (math_result.operand === "addition") {
-                  setOperand("+");
-                } else if (math_result.operand === "subtraction") {
-                  setOperand("-");
-                } else {
-                  setOperand("=");
-                }
-                console.log("have set the math skill inputs");
-              }
-            } catch (err) {
-              setError("An error occurred. Please try again.");
-            }
-            setStep(3);
-          } else {
-            console.log("signup fail", result);
-            setError(result.error || "Signup failed.");
-          }
-        } catch (err) {
-          setError("An error occurred. Please try again.");
+          setError(result.error || "Failed to save security questions.");
+          setLoading(false);
+          toast({
+            title: "Security Question setup failed",
+            description: result?.message,
+          });
+          return;
         }
+
+        const mathResponse = await fetch(`${auth_api}/api/mathskill`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ email: formData.email }),
+        });
+
+        if (!mathResponse.ok) {
+          const result = await mathResponse.json();
+          setError(result.error || "Failed to retrieve math question.");
+          setLoading(false);
+          return;
+        }
+
+        const mathResult = await mathResponse.json();
+        setMathOperand1(mathResult.operands[0]);
+        setMathOperand2(mathResult.operands[1]);
+        setAnswerToBe(mathResult.answer);
+
+        switch (mathResult.operand) {
+          case "addition":
+            setOperand("+");
+            break;
+          case "subtraction":
+            setOperand("-");
+            break;
+          default:
+            setOperand("=");
+            break;
+        }
+        toast({
+          title: "Security Question setup success",
+          description: "All questions were set",
+        });
+        setStep(3);
       } else if (step === 3) {
-        // TODO: Implement Lambda math skills verification
-        console.log("Verifying math skills:", formData.mathAnswer);
-        if (parseInt(formData.mathAnswer) === answerToBe) {
-          console.log("Correct answer. now confirming");
-
-          try {
-            const response = await fetch(
-              auth_api + "/api/signup/confirmation",
-              {
-                method: "POST",
-                headers: {
-                  "Content-Type": "application/json",
-                },
-                body: JSON.stringify({
-                  email: formData.email,
-                  status: "Confirmed",
-                }),
-              },
-            );
-
-            const result = await response.json();
-
-            if (result?.status === "Success") {
-              console.log("signup success", result);
-              setError("");
-              router.replace("/");
-            } else {
-              console.log("signup fail", result);
-              setError(result.error || "Signup failed.");
-            }
-          } catch (err) {
-            console.log(err);
-            setError("An error occurred. Please try again.");
-          }
+        if (parseInt(formData.mathAnswer) !== answerToBe) {
+          setError("Incorrect answer. Please try again.");
+          setLoading(false);
+          toast({
+            title: "Wrong Answer",
+            description: "Please try again",
+          });
+          return;
         }
+
+        const response = await fetch(`${auth_api}/api/signup/confirmation`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: formData.email,
+            status: "Confirmed",
+          }),
+        });
+
+        if (!response.ok) {
+          const result = await response.json();
+          setError(result.error || "Signup confirmation failed.");
+          setLoading(false);
+          toast({
+            title: "Signup confirmation failed",
+            description: result?.message,
+          });
+          return;
+        }
+
+        toast({
+          title: "Signup successful",
+        });
+        router.push("/");
       }
     } catch (err) {
-      setError("Signup failed. Please try again.");
+      console.error(err);
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -222,7 +230,7 @@ export default function SignupPage() {
           <CardTitle>Sign Up</CardTitle>
           <CardDescription>
             {step === 1 && "Create your account"}
-            {step === 2 && "Set up your security question"}
+            {step === 2 && "Set up your security questions"}
             {step === 3 && "Verify your math skills"}
           </CardDescription>
         </CardHeader>
@@ -243,7 +251,10 @@ export default function SignupPage() {
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="role">Role</Label>
-                  <Select onValueChange={handleSelectChange}>
+                  <Select
+                    onValueChange={(value) => handleChange(value, "role")}
+                    required
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="Select your role" />
                     </SelectTrigger>
@@ -329,7 +340,7 @@ export default function SignupPage() {
             {step === 3 && (
               <div className="space-y-1">
                 <Label htmlFor="mathAnswer">
-                  {`What is ${mathOperand1} ${operand} ${mathOperand2}`}
+                  {`What is ${mathOperand1} ${operand} ${mathOperand2}?`}
                 </Label>
                 <Input
                   id="mathAnswer"
@@ -342,8 +353,8 @@ export default function SignupPage() {
               </div>
             )}
             {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
-            <Button type="submit" className="w-full mt-4">
-              {step === 3 ? "Sign Up" : "Next"}
+            <Button type="submit" className="w-full mt-4" disabled={loading}>
+              {loading ? "Processing..." : step === 3 ? "Sign Up" : "Next"}
             </Button>
           </form>
         </CardContent>
