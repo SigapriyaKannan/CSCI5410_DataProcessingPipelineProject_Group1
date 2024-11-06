@@ -1,0 +1,112 @@
+Resources:
+  NamedEntitiesTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: NamedEntities
+      AttributeDefinitions:
+        - AttributeName: reference_code
+          AttributeType: S
+      KeySchema:
+        - AttributeName: reference_code
+          KeyType: HASH
+      BillingMode: PAY_PER_REQUEST
+
+  FileUploadBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: upload-bucket-nerprocess
+
+  EntityProcessorLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      Role: arn:aws:iam::617484601251:role/LabRole
+      PackageType: Image
+      Code:
+        ImageUri: "617484601251.dkr.ecr.us-east-1.amazonaws.com/ner-processor-lambda:latest"
+      Environment:
+        Variables:
+          DYNAMODB_TABLE: !Ref NamedEntitiesTable
+          S3_BUCKET_NAME: !Ref FileUploadBucket
+      MemorySize: 256
+      Timeout: 300
+
+  ApiGateway:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: NerProcessAPI
+      BinaryMediaTypes:
+        - multipart/form-data
+
+  ApiGatewayResource:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId: !GetAtt ApiGateway.RootResourceId
+      PathPart: nerprocess
+      RestApiId: !Ref ApiGateway
+
+  ApiGatewayMethodPost:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      AuthorizationType: NONE
+      HttpMethod: POST
+      ResourceId: !Ref ApiGatewayResource
+      RestApiId: !Ref ApiGateway
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri: !Sub
+          - arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LambdaArn}/invocations
+          - Region: !Ref "AWS::Region"
+            LambdaArn: !GetAtt EntityProcessorLambda.Arn
+
+  ApiGatewayMethodOptions:
+    Type: 'AWS::ApiGateway::Method'
+    Properties:
+      AuthorizationType: 'NONE'
+      HttpMethod: 'OPTIONS'
+      ResourceId: !Ref ApiGatewayResource
+      RestApiId: !Ref ApiGateway
+      Integration:
+        IntegrationResponses:
+          - StatusCode: 200
+            ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+              method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+              method.response.header.Access-Control-Allow-Origin: "'*'"
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+        Type: 'MOCK'
+      MethodResponses:
+        - StatusCode: 200
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+            method.response.header.Access-Control-Allow-Methods: "'POST,OPTIONS'"
+            method.response.header.Access-Control-Allow-Origin: "'*'"
+
+  ApiGatewayDeployment:
+    Type: 'AWS::ApiGateway::Deployment'
+    DependsOn: ApiGatewayMethodPost
+    Properties:
+      RestApiId: !Ref ApiGateway
+      StageName: 'prod'
+
+  ApiGatewayInvokeLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref EntityProcessorLambda
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ApiGateway}/prod/POST/nerprocess"
+
+Outputs:
+  S3BucketName:
+    Description: "S3 bucket for uploaded files"
+    Value: !Ref FileUploadBucket
+
+  DynamoDBTableName:
+    Description: "DynamoDB table for named entities"
+    Value: !Ref NamedEntitiesTable
+
+  FileUploadApiEndpoint:
+    Description: "API Gateway endpoint to perform named entity recognition process"
+    Value: !Sub "https://${ApiGateway}.execute-api.${AWS::Region}.amazonaws.com/prod/nerprocess"
