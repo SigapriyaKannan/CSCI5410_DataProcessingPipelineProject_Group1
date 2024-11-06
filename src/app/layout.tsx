@@ -5,6 +5,7 @@ import "./globals.css";
 import Navbar from "@/components/navbar";
 import Footer from "@/components/footer";
 import { Toaster } from "@/components/ui/toaster";
+import { UserProvider } from "./contexts/user-context";
 
 const default_font = Roboto({
   weight: ["300", "500", "700"],
@@ -35,19 +36,21 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body
-        className={
-          `${default_font.className} ${geistSans.variable} ${geistMono.variable} antialiased` +
-          "min-h-[80vh]"
-        }
-      >
-        <Navbar />
-        <main className="flex-grow flex justify-center items-center">
-          {children}
-        </main>
-        <Footer />
-        <Toaster />
-      </body>
+      <UserProvider>
+        <body
+          className={
+            `${default_font.className} ${geistSans.variable} ${geistMono.variable} antialiased` +
+            "min-h-[80vh]"
+          }
+        >
+          <Navbar />
+          <main className="flex-grow flex justify-center items-center">
+            {children}
+          </main>
+          <Footer />
+          <Toaster />
+        </body>
+      </UserProvider>
     </html>
   );
 }
