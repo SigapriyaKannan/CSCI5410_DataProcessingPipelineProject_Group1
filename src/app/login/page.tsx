@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { auth_api } from "@/lib/constants";
+import { auth_api, login_success_email } from "@/lib/constants";
 import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { UserContext } from "../contexts/user-context";
@@ -58,7 +58,7 @@ export default function LoginPage() {
 
         const result = await response.json();
 
-        if (!response.ok) {
+        if (result?.status !== "Success") {
           setError(result.error || "Login failed.");
           setLoading(false);
           toast({
@@ -82,7 +82,7 @@ export default function LoginPage() {
           body: JSON.stringify({ email: email }),
         });
 
-        if (!mathResponse.ok) {
+        if (result?.status !== "Success") {
           const result = await mathResponse.json();
           setError(result.error || "Failed to retrieve math question.");
           setLoading(false);
@@ -142,6 +142,18 @@ export default function LoginPage() {
           return;
         }
 
+        const login_success_response = await fetch(`${auth_api}/api/sns`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: email,
+            subject: login_success_email.subject,
+            message: login_success_email.message,
+          }),
+        });
+
         setUser({ email: email, idToken: idToken, accessToken: accessToken });
 
         toast({
@@ -152,7 +164,10 @@ export default function LoginPage() {
         router.replace("/");
       }
     } catch (err) {
+      console.error(err);
       setError("Authentication failed. Please try again.");
+    } finally {
+      setLoading(false);
     }
   };
 
