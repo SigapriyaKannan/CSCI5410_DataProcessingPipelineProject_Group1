@@ -4,7 +4,8 @@ import React, { createContext, useState, useEffect, ReactNode } from "react";
 
 interface User {
   email: string;
-  role: string;
+  idToken: string;
+  accessToken: string;
 }
 
 interface UserContextType {

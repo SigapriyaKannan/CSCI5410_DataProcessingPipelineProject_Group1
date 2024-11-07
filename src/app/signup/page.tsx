@@ -1,6 +1,6 @@
 "use client";
 
-import { useContext, useState } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,7 +23,6 @@ import { auth_api } from "@/lib/constants";
 import { security_questions_type, signup_request_type } from "../types/auth";
 import { useRouter } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
-import { UserContext } from "@/app/contexts/user-context";
 
 export default function SignupPage() {
   const [step, setStep] = useState(1);
@@ -45,7 +44,6 @@ export default function SignupPage() {
   const [answerToBe, setAnswerToBe] = useState(0);
   const [error, setError] = useState("");
 
-  const { setUser } = useContext(UserContext);
   const router = useRouter();
 
   const handleChange = (
@@ -212,11 +210,10 @@ export default function SignupPage() {
           return;
         }
 
-        setUser({ email: formData.email, role: formData.role });
         toast({
           title: "Signup successful",
         });
-        router.push("/");
+        router.push("/login");
       }
     } catch (err) {
       console.error(err);
