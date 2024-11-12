@@ -2,6 +2,7 @@ import sys
 import time
 import json
 import boto3
+import uuid
 from awsglue.transforms import *
 from awsglue.utils import getResolvedOptions
 from pyspark.context import SparkContext
@@ -36,12 +37,25 @@ file_path = f"s3://{bucket_name}/{s3_input_key}"
 # Read the input JSON file from S3
 df = spark.read.option("multiline", "true").json(file_path)
 
+
+def get_original_column_order(bucket_name, s3_input_key):
+    s3_object = s3.get_object(Bucket=bucket_name, Key=s3_input_key)
+    json_content = json.loads(s3_object['Body'].read())
+    if isinstance(json_content, list):
+        return list(json_content[0].keys())
+    elif isinstance(json_content, dict):
+        return list(json_content.keys())
+    else:
+        raise ValueError("Unexpected JSON format in the input file")
+
+
 # Function to check if the DataFrame is flattened
 def is_flattened(df):
     for field in df.schema.fields:
         if isinstance(field.dataType, (StructType, ArrayType, MapType)):
             return False
     return True
+
 
 # Function to flatten the JSON DataFrame
 def flatten_json(df):
@@ -78,13 +92,18 @@ def flatten_json(df):
 
     return df
 
-# Flattened Json DF
-flattened_df = flatten_json(df)
+
+if is_flattened(df):
+    original_column_order = get_original_column_order(bucket_name, s3_input_key)
+    if original_column_order:
+        df = df.select([col for col in original_column_order if col in df.columns])
+else:
+    df = flatten_json(df)
 
 # flattened data write as CSV to S3
 csv_filename = s3_input_key.replace('.json', '.csv')
 output_path = f"s3://{bucket_name}/output/{csv_filename}"
-flattened_df.write.mode("overwrite").option("header", "true").csv(output_path)
+df.write.mode("overwrite").option("header", "true").csv(output_path)
 
 # Introduce a delay to account for writing the CSV to S3
 time.sleep(60)
@@ -100,17 +119,19 @@ job_status = "SUCCEEDED"
 table.put_item(
     Item={
         'user_email': args['user_email'],  # Partition key
-        'json_file_name': csv_filename,     # Sort key
+        'processed_file_name': csv_filename,
         'S3JsonFilePath': file_path,
         'S3CsvFilePath': output_path,
         'JobStatus': job_status,
         'RowCount': row_count,
         'Columns': column_list,
         'SchemaTypes': json.dumps(schema_types),
-        'Timestamp': int(time.time())
+        'Timestamp': int(time.time()),
+        'process_code': str(uuid.uuid4())
     }
 )
-print(f"Metadata saved to DynamoDB for {s3_input_key}: Status - {job_status}, Rows - {row_count}, Columns - {column_list}")
+print(
+    f"Metadata saved to DynamoDB for {s3_input_key}: Status - {job_status}, Rows - {row_count}, Columns - {column_list}")
 
 # Glue job Completion
 job.commit()

@@ -2,6 +2,7 @@ import json
 import boto3
 import os
 import time
+import uuid
 
 # Initialize AWS clients
 glue_client = boto3.client('glue')
@@ -13,6 +14,7 @@ glue_job_name = os.environ['GLUE_JOB_NAME']
 bucket_name = os.environ['BUCKET_NAME']  # Add bucket name from environment variable
 
 def lambda_handler(event, context):
+    global user_email
     print("Received event:", json.dumps(event, indent=2))  # Log the event for debugging
 
     # Extract details directly from the event
@@ -81,20 +83,31 @@ def lambda_handler(event, context):
 def save_status_to_dynamodb(job_name, job_run_id, status, s3_key):
     """
     Save the status and metadata of the Glue job to DynamoDB.
+    This function appends the job status to the 'JobStatusHistory' list in DynamoDB.
+    If the list doesn't exist, it creates a new one.
+
     """
     table = dynamodb.Table(dynamodb_table_name)
 
     try:
-        # Save job metadata in DynamoDB
-        response = table.put_item(
-            Item={
-                'job_name': job_name,
-                'job_run_id': job_run_id,
-                'status': status,
-                's3_key': s3_key,
-                'timestamp': int(time.time())
-            }
+
+        response = table.update_item(
+            Key={'user_email': user_email},
+            UpdateExpression="SET #job_status_history = list_append(if_not_exists(#job_status_history, :empty_list), :new_status)",
+            ExpressionAttributeNames={
+                '#job_status_history': 'JobStatusHistory',
+            },
+            ExpressionAttributeValues={
+                ':new_status': [{
+                    'JobRunId': job_run_id,
+                    'JobStatus': status,
+                    'S3JsonFilePath': s3_key,
+                    'Timestamp': int(time.time())
+                }],
+                ':empty_list': []  # Initialize the list if it doesn't exist
+            },
+            ReturnValues="UPDATED_NEW"
         )
-        print(f"Status saved to DynamoDB for job {job_name} with run ID {job_run_id}.")
+        print(f"Appended job status to DynamoDB for user {user_email}.")
     except Exception as e:
         print(f"Error saving status to DynamoDB: {str(e)}")
