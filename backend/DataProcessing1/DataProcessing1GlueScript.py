@@ -13,7 +13,8 @@ from pyspark.sql.functions import *
 from pyspark.sql.types import *
 
 # Get job arguments
-args = getResolvedOptions(sys.argv, ['JOB_NAME', 's3_input_key', 'dynamodb_table_name', 'bucket_name', 'user_email'])
+args = getResolvedOptions(sys.argv, ['JOB_NAME', 's3_input_key', 'dynamodb_table_name', 'bucket_name', 'user_email',
+                                     'new_bucket_name', 'process_code'])
 print("Job Name: ", args['JOB_NAME'])
 
 # Initialize Spark and Glue contexts
@@ -101,8 +102,10 @@ else:
     df = flatten_json(df)
 
 # flattened data write as CSV to S3
+new_bucket_name = args['new_bucket_name']
+process_code = args['process_code']
 csv_filename = s3_input_key.replace('.json', '.csv')
-output_path = f"s3://{bucket_name}/output/{csv_filename}"
+output_path = f"s3://{new_bucket_name}/output/{csv_filename}"
 df.write.mode("overwrite").option("header", "true").csv(output_path)
 
 # Introduce a delay to account for writing the CSV to S3
@@ -127,7 +130,7 @@ table.put_item(
         'Columns': column_list,
         'SchemaTypes': json.dumps(schema_types),
         'Timestamp': int(time.time()),
-        'process_code': str(uuid.uuid4())
+        'process_code': process_code
     }
 )
 print(
