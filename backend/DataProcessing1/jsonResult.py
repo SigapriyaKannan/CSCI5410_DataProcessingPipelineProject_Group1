@@ -57,6 +57,9 @@ def lambda_handler(event, context):
                 'body': json.dumps(f'No job found for user {user_email} with process_code {process_code}.')
             }
 
+        # Extract the required fields from the DynamoDB item
+        job_item = response['Item']
+
         # Convert any Decimal objects to float or int for JSON serialization
         def decimal_to_float(obj):
             if isinstance(obj, Decimal):
@@ -68,10 +71,18 @@ def lambda_handler(event, context):
             else:
                 return obj
 
-        # Convert the item to JSON serializable format
-        serializable_item = decimal_to_float(response['Item'])
+        # Filter only the required columns
+        filtered_item = {
+            'JobStatus': job_item.get('JobStatus'),
+            'processed_file_name': job_item.get('processed_file_name'),
+            'S3CsvFilePath': job_item.get('S3CsvFilePath'),
+            'S3JsonFilePath': job_item.get('S3JsonFilePath')
+        }
 
-        # Return the retrieved item from DynamoDB
+        # Convert the filtered item to a JSON serializable format
+        serializable_item = decimal_to_float(filtered_item)
+
+        # Return the filtered item
         return {
             'statusCode': 200,
             'body': json.dumps(serializable_item)
