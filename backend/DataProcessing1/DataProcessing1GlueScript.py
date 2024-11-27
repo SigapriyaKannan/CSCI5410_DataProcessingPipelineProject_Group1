@@ -101,18 +101,41 @@ if is_flattened(df):
 else:
     df = flatten_json(df)
 
-# flattened data write as CSV to S3
+# Flattened data write as a single CSV to the root of the bucket
 new_bucket_name = args['new_bucket_name']
 process_code = args['process_code']
 csv_filename = s3_input_key.replace('.json', '.csv')
-output_path = f"s3://{new_bucket_name}/output/{csv_filename}"
-df.write.mode("overwrite").option("header", "true").csv(output_path)
+temp_output_path = f"s3://{new_bucket_name}/temp/"  # Temporary path for writing Spark output
+final_output_path = f"s3://{new_bucket_name}/{csv_filename}"  # Final path
+
+# Coalesce to a single partition to write only one file
+df.coalesce(1).write.mode("overwrite").option("header", "true").csv(temp_output_path)
 
 # Introduce a delay to account for writing the CSV to S3
 time.sleep(60)
 
+# Rename the part file to the desired file name
+response = s3.list_objects_v2(Bucket=new_bucket_name, Prefix="temp/")
+
+for obj in response.get('Contents', []):
+    key = obj['Key']
+    if key.endswith('.csv'):  # Identify the part file
+        # Copy the part file to the root of the bucket with the desired file name
+        copy_source = {'Bucket': new_bucket_name, 'Key': key}
+        s3.copy_object(CopySource=copy_source, Bucket=new_bucket_name, Key=csv_filename)
+
+        # Delete the temporary part file
+        s3.delete_object(Bucket=new_bucket_name, Key=key)
+
+# Delete the temp folder itself
+s3.delete_object(Bucket=new_bucket_name, Key="temp/")
+
+# Generate the public URL for the final file
+region = boto3.session.Session().region_name
+public_url = f"https://{new_bucket_name}.s3.{region}.amazonaws.com/{csv_filename}"
+
 # Read the CSV back to extract metadata
-csv_df = spark.read.option("header", "true").csv(output_path)
+csv_df = spark.read.option("header", "true").csv(final_output_path)
 row_count = csv_df.count()
 column_list = csv_df.columns
 schema_types = [(field.name, str(field.dataType)) for field in csv_df.schema.fields]
@@ -124,7 +147,7 @@ table.put_item(
         'user_email': args['user_email'],  # Partition key
         'processed_file_name': csv_filename,
         'S3JsonFilePath': file_path,
-        'S3CsvFilePath': output_path,
+        'S3CsvFilePath': public_url,  # Public URL instead of URI
         'JobStatus': job_status,
         'RowCount': row_count,
         'Columns': column_list,
