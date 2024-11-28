@@ -7,6 +7,7 @@ import re
 import requests
 from requests_toolbelt.multipart import decoder
 from time import sleep
+import time
 
 # Initialize AWS clients
 s3_client = boto3.client('s3')
@@ -110,7 +111,7 @@ def lambda_handler(event, context):
     metadata = {
         'filename': file_name,
         'file_size': len(file_content),
-        'upload_timestamp': context.aws_request_id,
+        'Timestamp': int(time.time()),
         'user_email': user_email,
         'role': role,
         'process_code': str(uuid.uuid4())
