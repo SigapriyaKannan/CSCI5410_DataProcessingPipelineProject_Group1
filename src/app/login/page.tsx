@@ -21,6 +21,7 @@ export default function LoginPage() {
   const [step, setStep] = useState(1);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [role, setRole] = useState("");
   const [securityQuestion, setSecurityQuestion] = useState("");
   const [securityAnswer, setSecurityAnswer] = useState("");
   const [actualSecurityAnswer, setActualSecurityAnswer] = useState("");
@@ -73,6 +74,7 @@ export default function LoginPage() {
 
         setIdToken(result?.idToken);
         setAccessToken(result?.AccessToken);
+        setRole(result?.role);
 
         const mathResponse = await fetch(`${auth_api}/api/mathskill`, {
           method: "POST",
@@ -142,7 +144,7 @@ export default function LoginPage() {
           return;
         }
 
-        setUser({ email: email, idToken: idToken, accessToken: accessToken });
+        setUser({ email: email, idToken: idToken, accessToken: accessToken, role: role });
 
         toast({
           title: "Correct! Login Success",
