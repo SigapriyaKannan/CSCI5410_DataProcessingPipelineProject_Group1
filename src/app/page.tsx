@@ -1,9 +1,17 @@
+'use client'
+
 import Link from "next/link";
-import { ArrowRight, Upload, Bot, FileText } from "lucide-react";
+import { useState } from "react";
+import { ArrowRight, Upload, Bot, FileText, ChevronDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 export default function HomePage() {
+
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+
+  const toggleDropdown = () => setIsDropdownOpen(!isDropdownOpen);
+
   return (
     <div className="flex flex-col min-h-screen">
       {/* Hero Section */}
@@ -17,12 +25,46 @@ export default function HomePage() {
               Powerful data processing at your fingertips. Transform your CSV,
               TXT, and JSON files instantly.
             </p>
-            <div className="space-x-4 mt-8">
-              <Button asChild size="lg">
-                <Link href="/upload">
-                  Try Now <Upload className="ml-2 h-4 w-4" />
-                </Link>
+            <div className="relative mt-8">
+              <Button
+                size="lg"
+                className="flex items-center"
+                onClick={toggleDropdown}
+              >
+                Try Now <ChevronDown className="ml-2 h-4 w-4" />
               </Button>
+              {isDropdownOpen && (
+                <div className="absolute top-12 left-0 w-48 bg-white border rounded-md shadow-md z-10">
+                  <ul className="py-2">
+                    <li>
+                      <Link
+                        href="/dataprocessing/1"
+                        className="block px-4 py-2 hover:bg-gray-100"
+                      >
+                        Json To CSV
+                      </Link>
+                    </li>
+                    <li>
+                      <Link
+                        href="/dataprocessing/2"
+                        className="block px-4 py-2 hover:bg-gray-100"
+                      >
+                        Text To Entities
+                      </Link>
+                    </li>
+                    <li>
+                      <Link
+                        href="/dataprocessing/3"
+                        className="block px-4 py-2 hover:bg-gray-100"
+                      >
+                        Word Cloud
+                      </Link>
+                    </li>
+                  </ul>
+                </div>
+              )}
+            </div>
+            <div className="mt-4">
               <Button variant="outline" size="lg" asChild>
                 <Link href="/signup">
                   Register <ArrowRight className="ml-2 h-4 w-4" />
