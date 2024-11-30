@@ -7,6 +7,7 @@ import re
 import requests
 from requests_toolbelt.multipart import decoder
 from time import sleep
+import time
 
 # Initialize AWS clients
 s3_client = boto3.client('s3')
@@ -16,6 +17,7 @@ dynamodb = boto3.resource('dynamodb')
 bucket_name = os.environ['BUCKET_NAME']
 dynamodb_table_name = os.environ['DYNAMODB_TABLE_NAME']
 google_function_url = os.environ['GOOGLE_FUNCTION_URL']  # URL of the Google Cloud Function
+sns_lambda_url = os.environ['SNS_LAMBDA_URL']  # URL of the SNS Lambda topic
 
 
 def lambda_handler(event, context):
@@ -59,6 +61,8 @@ def lambda_handler(event, context):
 
     # Generate a unique .txt filename
     file_name = f"{user_email}_{uuid.uuid4()}.txt"
+    looker_url = f"https://lookerstudio.google.com/embed/u/0/reporting/3f0d711f-fff6-4150-9e99-8ddad8228e84/page/4GqLE?user_email_parameter={user_email}"
+    iframe = f'<iframe src="{looker_url}" width="100%" height="600" frameborder="0" style="border:0" allowfullscreen></iframe>'
 
     # Upload the .txt file to S3 with metadata
     try:
@@ -100,20 +104,37 @@ def lambda_handler(event, context):
     # Invoke Google Cloud Function to write data to Firestore (without Authorization)
     try:
         response = requests.post(google_function_url, json=google_function_payload)
-        response.raise_for_status()  # This will raise an exception for non-2xx status codes
+        response.raise_for_status()
     except requests.exceptions.RequestException as e:
         print(f"Error invoking Google Cloud Function: {str(e)}")
         return {"statusCode": 500, "body": json.dumps(f'Error invoking Google Cloud Function: {str(e)}')}
+
+    sns_lambda_payload = {
+        "email": user_email,
+        "subject": "Data Processing Job has ran successfully",
+        "message": f"Your Word Cloud for {file_name} has been generated successfully. You can access it here: {looker_url}"
+    }
+
+    print(sns_lambda_payload)
+
+    try:
+        response = requests.post(sns_lambda_url, json=sns_lambda_payload)
+        response.raise_for_status()
+    except requests.exceptions.RequestException as e:
+        print(f"Error invoking Lambda Cloud Function: {str(e)}")
+        return {"statusCode": 500, "body": json.dumps(f'Error invoking Lambda Cloud Function: {str(e)}')}
 
     # Save metadata to DynamoDB
     table = dynamodb.Table(dynamodb_table_name)
     metadata = {
         'filename': file_name,
         'file_size': len(file_content),
-        'upload_timestamp': context.aws_request_id,
+        'Timestamp': int(time.time()),
         'user_email': user_email,
         'role': role,
-        'process_code': str(uuid.uuid4())
+        'process_code': str(uuid.uuid4()),
+        'Url': looker_url,
+        'DownloadUrl': iframe
     }
 
     try:

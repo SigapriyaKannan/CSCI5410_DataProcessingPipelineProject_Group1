@@ -8,6 +8,7 @@ dynamodb = boto3.resource('dynamodb')
 
 # Environment variables
 dynamodb_table_name = os.environ['DYNAMODB_TABLE_NAME']
+second_table_name = os.environ['SECOND_DYNAMODB_TABLE_NAME']
 google_function_url = os.environ['GOOGLE_FUNCTION_URL']
 
 def lambda_handler(event, context):
@@ -23,24 +24,42 @@ def lambda_handler(event, context):
     if role.lower() == "agent":
         return {"statusCode": 403, "body": json.dumps({"error": "Access denied: Role not permitted"})}
 
-    # Query DynamoDB for all records associated with the email
+    # Query DynamoDB tables
+    items = []  # Initialize an empty list to hold data from both tables
+    found_in_either = False  # Flag to track if the email is found in at least one table
+
     try:
-        table = dynamodb.Table(dynamodb_table_name)
-        response = table.query(
+        # Query the first table
+        table1 = dynamodb.Table(dynamodb_table_name)
+        response1 = table1.query(
             KeyConditionExpression=boto3.dynamodb.conditions.Key('user_email').eq(email)
         )
-        items = response.get('Items', [])
+        table1_items = response1.get('Items', [])
+        if table1_items:
+            found_in_either = True
+            items.extend(table1_items)  # Append data from the first table
 
-        if not items:
-            return {"statusCode": 404, "body": json.dumps({"error": "No data found for the provided email"})}
+        # Query the second table
+        table2 = dynamodb.Table(second_table_name)
+        response2 = table2.query(
+            KeyConditionExpression=boto3.dynamodb.conditions.Key('user_email').eq(email)
+        )
+        table2_items = response2.get('Items', [])
+        if table2_items:
+            found_in_either = True
+            items.extend(table2_items)  # Append data from the second table
     except Exception as e:
         return {"statusCode": 500, "body": json.dumps({"error": f"DynamoDB query error: {str(e)}"})}
+
+    # Check if the email was not found in either table
+    if not found_in_either:
+        return {"statusCode": 404, "body": json.dumps({"error": "No data found for the provided email in either table"})}
 
     # Prepare data for GCP Cloud Function
     gcp_payload = {
         "user_email": email,
         "role": role,
-        "data": items  # Includes all records with process_code
+        "data": items  # Includes data from both tables without altering schema
     }
 
     # Send the data to the GCP Cloud Function
