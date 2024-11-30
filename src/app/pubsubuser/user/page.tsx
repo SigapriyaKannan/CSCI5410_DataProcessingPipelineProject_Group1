@@ -6,19 +6,37 @@ import axios from 'axios'; // Import axios
 export default function UserChatPage() {
   const [processCodes, setProcessCodes] = useState<string[]>([]);
   const [selectedProcessCode, setSelectedProcessCode] = useState<string>('');
+  const [shouldPoll, setShouldPoll] = useState(true);
   const [chatMessages, setChatMessages] = useState<{ sender: string; message: string }[]>([]);
   const [newMessage, setNewMessage] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingProcessCodes, setIsFetchingProcessCodes] = useState(false);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [role, setRole] = useState<string>('user'); 
 
-  const userEmail = localStorage.getItem('user_email'); // Retrieve user email from localStorage
+  // const userEmail = localStorage.getItem('user_email'); // Retrieve user email from localStorage
 
   useEffect(() => {
-    if (!userEmail) {
-      console.error('User email is not available in localStorage');
+    const userEmailFromStorage = localStorage.getItem('user_email');
+    const roleFromStorage = localStorage.getItem('role');
+
+    if (userEmailFromStorage) {
+      setUserEmail(userEmailFromStorage);
     }
+
+    if (roleFromStorage) {
+      setRole(roleFromStorage);
+    } else {
+      setRole('user'); // Default role if not found
+    }
+  }, []);
+
+  useEffect(() => {
+    // if (!userEmail) {
+    //   console.error('User email is not available in localStorage');
+    // }
     fetchProcessCodes();
-  }, [userEmail, setProcessCodes, setIsFetchingProcessCodes]);
+  }, [userEmail]);
 
   useEffect(() => {
     if (!selectedProcessCode) return;
@@ -26,21 +44,29 @@ export default function UserChatPage() {
     // Initial call to refresh chat
     refreshChat();
 
+    if (!shouldPoll) {
+      console.log('Polling stopped due to an error or 404 response');
+      return; // Stop further polling if shouldPoll is false
+    }
+
     // Poll every 20 seconds
     const intervalId = setInterval(() => {
-      refreshChat();
+      if (shouldPoll) {
+        refreshChat(); // Poll only if shouldPoll is true
+      } else {
+        clearInterval(intervalId); // Clear the interval if polling should stop
+      }
     }, 20000);
 
-    // Cleanup the interval when the component unmounts or selectedProcessCode changes
-    return () => {
-      clearInterval(intervalId);
-    };
-  }, [selectedProcessCode]);
+    // Cleanup the interval on unmount or when polling stops
+    return () => clearInterval(intervalId);
+
+  }, [selectedProcessCode, shouldPoll]);
 
   // Fetch process codes for the user manually when the button is clicked
   const fetchProcessCodes = async () => {
     if (!userEmail) {
-      console.error('User email is not available in localStorage');
+      console.log('User email is not available in localStorage');
       return;
     }
 
@@ -125,11 +151,23 @@ export default function UserChatPage() {
         { process_code: selectedProcessCode },
         { headers: { 'Content-Type': 'application/json' } }
       );
-
+      console.log('Full response:', response);
       console.log('Chat messages refreshed:', response.data);
       setChatMessages(response.data.messages || []);
     } catch (error) {
-      console.error('Error refreshing chat:', error);
+      if (axios.isAxiosError(error)) {
+        // Axios error handling
+        if (error.response) {
+          console.log('Error refreshing chat (Axios response error):', error.response.data || error.message);
+          // return;
+        } else {
+          console.log('Error refreshing chat (Axios network or timeout):', error.message);
+          // return;
+        }
+      } else {
+        // General error handling
+        console.error('Error refreshing chat (non-Axios error):', error);
+      }
     }
   };
 
@@ -146,7 +184,7 @@ export default function UserChatPage() {
         'https://northamerica-northeast2-serverless-440903.cloudfunctions.net/EndConversationApi',
         {
             process_code: selectedProcessCode,
-            role: localStorage.getItem('role'),
+            role: role,
             status: "yes",
           
         },
