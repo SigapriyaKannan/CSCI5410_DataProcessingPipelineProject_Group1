@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 
 export default function AgentChatPage() {
+
   const [processCodes, setProcessCodes] = useState<string[]>([]);
   const [selectedProcessCode, setSelectedProcessCode] = useState<string>('');
   const [chatMessages, setChatMessages] = useState<{ sender: string; message: string }[]>([]);
@@ -11,15 +12,29 @@ export default function AgentChatPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isFetchingProcessCodes, setIsFetchingProcessCodes] = useState(false);
   const [isEndingChat, setIsEndingChat] = useState(false); // To track if the agent is ending the chat
-  const [confirmationStatus, setConfirmationStatus] = useState<string | null>(null); // To store "yes" or "no" from the agent
   const [processCodeForEndChat, setProcessCodeForEndChat] = useState<string>(''); // Store process code when ending chat
+  const [agentEmail, setAgentEmail] = useState<string | null>(null); // State to hold agent email
+  const [role, setRole] = useState<string>('agent'); // State to hold role
 
-  const agentEmail = localStorage.getItem('agent_email'); // Retrieve agent email from localStorage
-  const role = localStorage.getItem('role'); // Retrieve role from localStorage (expected to be 'agent')
+  // Use effect to safely access localStorage only on the client side
+  useEffect(() => {
+    const agentEmailFromStorage = localStorage.getItem('agent_email');
+    const roleFromStorage = localStorage.getItem('role');
+
+    if (agentEmailFromStorage) {
+      setAgentEmail(agentEmailFromStorage);
+    }
+
+    if (roleFromStorage) {
+      setRole(roleFromStorage);
+    } else {
+      setRole('agent'); // Default role if not found
+    }
+  }, []); // Empty dependency array ensures this runs only once on the client side
 
   useEffect(() => {
     if (!agentEmail) {
-      console.error('Agent email is not available in localStorage');
+      // console.error('Agent email is not available in localStorage');
       return;
     }
     fetchProcessCodes();
