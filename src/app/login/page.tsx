@@ -154,6 +154,20 @@ export default function LoginPage() {
           }),
         });
 
+        const log_user_login_response = await fetch(
+          `https://us-central1-k8s-assignment-csci5409.cloudfunctions.net/log-user-login`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              user_id: email,
+              user_type: "user", // TODO: make this actual user type
+            }),
+          },
+        );
+
         setUser({ email: email, idToken: idToken, accessToken: accessToken });
 
         toast({
