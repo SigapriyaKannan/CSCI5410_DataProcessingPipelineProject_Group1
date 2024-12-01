@@ -12,7 +12,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { auth_api, login_success_email } from "@/lib/constants";
+import { auth_api, log_api, login_success_email } from "@/lib/constants";
 import { toast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import { UserContext } from "../contexts/user-context";
@@ -155,7 +155,7 @@ export default function LoginPage() {
         });
 
         const log_user_login_response = await fetch(
-          `https://us-central1-k8s-assignment-csci5409.cloudfunctions.net/log-user-login`,
+          `${log_api}/log-user-login`,
           {
             method: "POST",
             headers: {

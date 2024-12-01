@@ -1,6 +1,9 @@
 export const auth_api: string =
   process.env.NEXT_PUBLIC_AUTH_API ?? "please-set-auth-api-env-variable";
 
+export const log_api: string =
+  process.env.NEXT_PUBLIC_LOG_API ?? "please-set-log-api-env-variable";
+
 export const register_started_email = {
   subject: "Registration Started for QuickDataPro",
   message: `
