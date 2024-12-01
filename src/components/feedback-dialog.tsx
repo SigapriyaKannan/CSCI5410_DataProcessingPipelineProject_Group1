@@ -15,7 +15,11 @@ import {
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 
-export function FeedbackDialog() {
+interface FeedbackDialogProps {
+  feature: string;
+}
+
+export function FeedbackDialog({ feature }: FeedbackDialogProps) {
   const [feedback, setFeedback] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
@@ -34,6 +38,7 @@ export function FeedbackDialog() {
           },
           body: JSON.stringify({
             feedback,
+            feature
           }),
         },
       );

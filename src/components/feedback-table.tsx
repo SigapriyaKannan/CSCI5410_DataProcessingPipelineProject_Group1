@@ -23,12 +23,17 @@ import {
 interface FeedbackSentiment {
   id: string;
   feedback: string;
+  feature: string;
   timestamp: string;
   sentiment_score: number;
   sentiment_magnitude: number;
 }
 
-export function FeedbackTable() {
+interface FeedbackTableProps {
+  feature: string;
+}
+
+export function FeedbackTable({ feature }: FeedbackTableProps) {
   const [feedbacks, setFeedbacks] = useState<FeedbackSentiment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +45,7 @@ export function FeedbackTable() {
     try {
       setIsLoading(true);
       const response = await fetch(
-        "https://us-central1-k8s-assignment-csci5409.cloudfunctions.net/get-feedbacks",
+        `https://us-central1-k8s-assignment-csci5409.cloudfunctions.net/get-feedbacks?feature=${feature}`,
       );
 
       if (!response.ok) {
@@ -115,6 +120,7 @@ export function FeedbackTable() {
           <TableRow>
             <TableHead>Timestamp</TableHead>
             <TableHead>Feedback</TableHead>
+            <TableHead>Feature</TableHead>
             <TableHead>Sentiment</TableHead>
             <TableHead>Actions</TableHead>
           </TableRow>
@@ -128,6 +134,7 @@ export function FeedbackTable() {
               <TableCell className="text-wrap max-w-screen-sm">
                 {feedback.feedback}
               </TableCell>
+              <TableCell>{feedback.feature}</TableCell>
               <TableCell>
                 <Badge
                   variant={getSentimentVariant(feedback.sentiment_score)}

@@ -17,9 +17,14 @@ export default function Navbar() {
 
   const navItems = [
     { name: "Home", href: "/" },
-    { name: "Features", href: "/features" },
-    { name: "Pricing", href: "/pricing" },
+    { name: "DP1", href: "/dataprocessing/1" },
+    { name: "DP2", href: "/dataprocessing/2" },
+    { name: "DP3", href: "/dataprocessing/3" },
   ];
+
+  if (user && user.role === "Agent") {
+    navItems.push({ name: "Dashboard", href: "/admin/dashboard" });
+  }
 
   return (
     <nav className="bg-background border-b">

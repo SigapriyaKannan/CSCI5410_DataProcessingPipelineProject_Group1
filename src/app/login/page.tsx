@@ -144,7 +144,6 @@ export default function LoginPage() {
           return;
         }
 
-<<<<<<< HEAD
         const login_success_response = await fetch(`${auth_api}/api/sns`, {
           method: "POST",
           headers: {
@@ -166,15 +165,17 @@ export default function LoginPage() {
             },
             body: JSON.stringify({
               user_id: email,
-              user_type: "user", // TODO: make this actual user type
+              user_type: role,
             }),
           },
         );
 
-        setUser({ email: email, idToken: idToken, accessToken: accessToken });
-=======
-        setUser({ email: email, idToken: idToken, accessToken: accessToken, role: role });
->>>>>>> b60563a6ce721deb0f86596604840569e193d8ce
+        setUser({
+          email: email,
+          idToken: idToken,
+          accessToken: accessToken,
+          role: role,
+        });
 
         toast({
           title: "Correct! Login Success",
