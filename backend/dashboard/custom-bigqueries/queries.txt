@@ -1,0 +1,43 @@
+-- Monthly Logins
+SELECT 
+  FORMAT_DATE('%Y-%m', DATE(login_timestamp)) as month,
+  COUNT(*) as monthly_logins
+FROM `QuickDataPro.user_logins`
+GROUP BY month
+ORDER BY month
+
+-- Daily Logins
+
+SELECT 
+  DATE(login_timestamp) as login_date, 
+  COUNT(*) as total_daily_logins
+FROM `QuickDataPro.user_logins`
+GROUP BY login_date
+ORDER BY login_date
+
+-- Top 10 Users by Login Count
+
+SELECT 
+  user_id, 
+  COUNT(*) as login_count
+FROM `QuickDataPro.user_logins`
+GROUP BY user_id
+ORDER BY login_count DESC
+LIMIT 10
+
+-- Hourly Logins
+
+WITH hourly_logins AS (
+  SELECT 
+    EXTRACT(HOUR FROM login_timestamp) AS login_hour,
+    COUNT(*) AS total_logins
+  FROM `QuickDataPro.user_logins`
+  WHERE login_timestamp >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 DAY)
+  GROUP BY login_hour
+)
+SELECT 
+  login_hour,
+  total_logins,
+  RANK() OVER (ORDER BY total_logins DESC) AS login_rank
+FROM hourly_logins
+
