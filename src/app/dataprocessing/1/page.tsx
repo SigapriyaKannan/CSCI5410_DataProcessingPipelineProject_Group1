@@ -1,12 +1,15 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useContext } from 'react';
 import { useDropzone } from 'react-dropzone';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2 } from 'lucide-react';
 import { FileHistory } from '@/components/file-history-dp1';
+import { FeedbackDialog } from '@/components/feedback-dialog';
+import { FeedbackTable } from '@/components/feedback-table';
 import { auth_api } from "@/lib/constants";
+import { UserContext } from "@/app/contexts/user-context";
 
 interface FileDetails {
   fileName: string;
@@ -22,6 +25,7 @@ export default function FileUploadPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [fileHistory, setFileHistory] = useState<FileDetails[]>([]);
   const [isFetching, setIsFetching] = useState(true);
+  const { user } = useContext(UserContext);
 
   // Fetch file history
   useEffect(() => {
@@ -213,6 +217,10 @@ export default function FileUploadPage() {
 
         {/* File History Section */}
         <FileHistory files={fileHistory} />
+
+        {/* Feedback Section */}
+        <FeedbackTable feature="dp1" />
+        { user && user.role === "Registered" && <FeedbackDialog feature="dp1" />}
       </div>
     </div>
   );
