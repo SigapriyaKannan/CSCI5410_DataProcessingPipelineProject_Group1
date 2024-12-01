@@ -97,6 +97,10 @@ def lambda_handler(event, context):
     file_extension = ".json"
     file_name = f"{user_email}_{uuid.uuid4()}{file_extension}"
 
+    # Generate unique Job ID
+    process_code = str(uuid.uuid4())
+    print(f"Generated Job ID: {process_code}")
+
     # Upload the file to S3 with metadata
     try:
         s3_client.put_object(
@@ -105,7 +109,8 @@ def lambda_handler(event, context):
             Body=file_content,
             Metadata={
                 'user_email': user_email,
-                'role': role or 'guest'
+                'role': role or 'guest',
+                'process_code': process_code  # Attach Job ID as metadata
             }
         )
         print("File uploaded successfully with metadata:", file_name)
@@ -125,21 +130,25 @@ def lambda_handler(event, context):
                 'body': json.dumps('Failed to confirm file availability in S3.')
             }
 
-        # Trigger glueTriggerLambda
+        # Trigger glueTriggerLambda with the Job ID
         response = lambda_client.invoke(
             FunctionName=glue_trigger_lambda_name,
             InvocationType='Event',  # Asynchronous invocation
             Payload=json.dumps({
                 's3_input_key': file_name,
                 'user_email': user_email,
-                'role': role
+                'role': role,
+                'process_code': process_code  # Pass Job ID to glueTriggerLambda
             })
         )
         print("glueTriggerLambda triggered successfully.")
 
         return {
             'statusCode': 200,
-            'body': json.dumps(f'File uploaded and Glue job triggered successfully: {file_name}')
+            'body': json.dumps({
+                'message': 'File uploaded and Glue job triggered successfully.',
+                'process_code': process_code  # Return Job ID to the frontend
+            })
         }
     except Exception as e:
         print("Error uploading file or triggering Glue job:", str(e))
