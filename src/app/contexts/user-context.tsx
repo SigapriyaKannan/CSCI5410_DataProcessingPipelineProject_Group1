@@ -36,6 +36,7 @@ export const UserProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (user) {
       localStorage.setItem("user", JSON.stringify(user));
+      localStorage.setItem("user_email", user.email);
     } else {
       localStorage.removeItem("user");
     }
