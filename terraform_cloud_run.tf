@@ -40,6 +40,16 @@ resource "google_cloud_run_service" "app" {
     spec {
       containers {
         image = var.image
+        
+        # Environment variables
+        env {
+          name  = "NEXT_PUBLIC_AUTH_API"
+          value = "https://jzi33rv5fg.execute-api.us-east-1.amazonaws.com/Dev"
+        }
+        env {
+          name  = "NEXT_PUBLIC_LOG_API"
+          value = "https://us-central1-k8s-assignment-csci5409.cloudfunctions.net"
+        }
         ports {
           container_port = 80
         }
