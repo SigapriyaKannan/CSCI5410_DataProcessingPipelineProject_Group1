@@ -32,9 +32,8 @@ deploy-job:
   - cp $GCP_KEY_FILE /tmp/credentials.json
   - export GOOGLE_APPLICATION_CREDENTIALS="/tmp/credentials.json"
   - terraform init
-  - terraform validate
-  - terraform destroy # destroy the previous deployment
   script:
+  - terraform destroy -auto-approve -var="project_id=$GCP_PROJECT_ID" -var="region=us-central1" -var="image=gcr.io/$GCP_PROJECT_ID/serverless"
   - terraform apply -auto-approve -var="project_id=$GCP_PROJECT_ID" -var="region=us-central1" -var="image=gcr.io/$GCP_PROJECT_ID/serverless"
   after_script:
   - rm -f /tmp/gcloud-service-key.json
