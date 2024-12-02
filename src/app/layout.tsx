@@ -27,7 +27,7 @@ const geistMono = localFont({
 
 export const metadata: Metadata = {
   title: "QuickDataProcessor",
-  description: "An all-in-one data processing tool",
+  description: "An all-in-one data processing tool by QuickDataProcessor",
 };
 
 export default function RootLayout({
