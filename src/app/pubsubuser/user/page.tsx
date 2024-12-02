@@ -17,8 +17,9 @@ export default function UserChatPage() {
   // const userEmail = localStorage.getItem('user_email'); // Retrieve user email from localStorage
 
   useEffect(() => {
-    const userEmailFromStorage = localStorage.getItem('user_email');
-    const roleFromStorage = localStorage.getItem('role');
+    const userInfo = JSON.parse(localStorage.getItem('user') || '{}');
+    const userEmailFromStorage = userInfo.email;
+    const roleFromStorage = userInfo.role;
 
     if (userEmailFromStorage) {
       setUserEmail(userEmailFromStorage);
