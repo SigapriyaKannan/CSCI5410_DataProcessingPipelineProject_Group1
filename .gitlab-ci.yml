@@ -31,7 +31,7 @@ deploy-job:
   before_script:
   - cp $GCP_KEY_FILE /tmp/credentials.json
   - export GOOGLE_APPLICATION_CREDENTIALS="/tmp/credentials.json"
-  - terrafrom destroy # destroy the previous deployment
+  - terraform destroy # destroy the previous deployment
   - terraform init
   script:
   - terraform apply -auto-approve -var="project_id=$GCP_PROJECT_ID" -var="region=us-central1" -var="image=gcr.io/$GCP_PROJECT_ID/serverless"
