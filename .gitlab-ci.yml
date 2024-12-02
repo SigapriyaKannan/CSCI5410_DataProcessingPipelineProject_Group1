@@ -33,8 +33,8 @@ deploy-job:
   - export GOOGLE_APPLICATION_CREDENTIALS="/tmp/credentials.json"
   - terraform init
   script:
-  - terraform destroy -auto-approve -var="project_id=$GCP_PROJECT_ID" -var="region=us-central1" -var="image=gcr.io/$GCP_PROJECT_ID/serverless/next-frontend"
-  - terraform apply -auto-approve -var="project_id=$GCP_PROJECT_ID" -var="region=us-central1" -var="image=gcr.io/$GCP_PROJECT_ID/serverless/next-frontend"
+  - terraform destroy -auto-approve -var="project_id=$GCP_PROJECT_ID" -var="region=us-central1" -var="image=gcr.io/$GCP_PROJECT_ID/serverless/next-frontend:latest"
+  - terraform apply -auto-approve -var="project_id=$GCP_PROJECT_ID" -var="region=us-central1" -var="image=gcr.io/$GCP_PROJECT_ID/serverless/next-frontend:latest"
   after_script:
   - rm -f /tmp/gcloud-service-key.json
   only:
