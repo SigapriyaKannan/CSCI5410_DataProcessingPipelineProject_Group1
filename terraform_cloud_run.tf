@@ -27,7 +27,7 @@ variable "region" {
 }
 
 variable "image" {
-  description = "gcr.io/kube-assignment-428815/serverless/next-frontend"
+  description = "gcr.io/kube-assignment-428815/serverless/next-frontend:latest"
   type        = string
 }
 
