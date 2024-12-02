@@ -31,18 +31,8 @@ variable "image" {
   type        = string
 }
 
-resource "null_resource" "delete_cloud_run" {
-  provisioner "local-exec" {
-    command = "gcloud run services delete quickdataprocessor --region=${var.region} --project=${var.project_id} --quiet"
-  }
-
-  triggers = {
-    always_run = "${timestamp()}"
-  }
-}
-
+# Cloud Run Service
 resource "google_cloud_run_service" "app" {
-  depends_on = [null_resource.delete_cloud_run]
   name     = "quickdataprocessor"
   location = var.region
 
