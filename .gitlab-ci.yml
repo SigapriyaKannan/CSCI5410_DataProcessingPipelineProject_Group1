@@ -1,18 +1,21 @@
-stages:          # List of stages for jobs, and their order of execution
+stages:
   - deploy
- 
-deploy-job:     
+
+deploy-job:
   stage: deploy
-  image: google/cloud-sdk:alpine
-  script:
+  image: hashicorp/terraform:light
+  before_script:
+    - apk add --no-cache bash curl jq
+    - curl -fsSL https://dl.google.com/dl/cloudsdk/channels/rapid/downloads/google-cloud-sdk-385.0.1-linux-x86_64.tar.gz | tar -xz
+    - ./google-cloud-sdk/install.sh -q
     - echo $GCP_KEY > /tmp/gcloud-service-key.json
-    - gcloud auth activate-service-account --key-file /tmp/gcloud-service-key.json
+    - gcloud auth activate-service-account --key-file=/tmp/gcloud-service-key.json
     - gcloud config set project $GCP_PROJECT_ID
-    - gcloud builds submit . --config=cloudbuild.yaml
-    - echo "Application successfully deployed."
+    - terraform init
+  script:
+    - terraform apply -auto-approve -var="project_id=$GCP_PROJECT_ID" -var="region=us-central1" -var="image=gcr.io/$GCP_PROJECT_ID/serverless"
+  after_script:
+    - rm /tmp/gcloud-service-key.json
   only:
     - main
     - develop
- 
-after_script:
-    - rm /tmp/gcloud-service-key.json
