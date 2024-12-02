@@ -6,13 +6,13 @@ deploy-job:
   image: hashicorp/terraform:light
   before_script:
     - apk add --no-cache bash curl
-    - echo $GCP_KEY > /tmp/gcloud-service-key.json
+    - echo "$GCP_KEY" > /tmp/gcloud-service-key.json
     - export GOOGLE_APPLICATION_CREDENTIALS="/tmp/gcloud-service-key.json"
     - terraform init
   script:
     - terraform apply -auto-approve -var="project_id=$GCP_PROJECT_ID" -var="region=us-central1" -var="image=gcr.io/$GCP_PROJECT_ID/serverless"
   after_script:
-    - rm /tmp/gcloud-service-key.json
+    - rm -f /tmp/gcloud-service-key.json
   only:
     - main
     - develop
