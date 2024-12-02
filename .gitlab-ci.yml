@@ -20,8 +20,11 @@ build-job:
   after_script:
   - rm /tmp/gcloud-service-key.json
   only:
-  - main
-  - develop
+    refs:
+    - main
+    - develop
+    changes:
+    - src/**/*
 
 deploy-job:
   stage: deploy
