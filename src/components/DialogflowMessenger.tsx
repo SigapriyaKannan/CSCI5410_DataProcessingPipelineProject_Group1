@@ -29,7 +29,7 @@ const DialogflowMessenger = () => {
 
       // Add event listener to capture user query
       dfMessenger.addEventListener('df-request-sent', function(event:any) {
-        const userEmail = localStorage.getItem("user_email") || "siga@gmail.com";
+        const userEmail = localStorage.getItem("user_email");
 
         // Add user_email to session parameters
         event.detail.requestBody.queryInput = {
@@ -64,9 +64,6 @@ const DialogflowMessenger = () => {
       const styleTag = document.createElement("style");
       styleTag.textContent = customStyle;
       document.head.appendChild(styleTag);
-
-      // Store user email in localStorage (you can replace this with actual logic)
-      localStorage.setItem('user_email', 'user@example.com');
 
       // Append the Dialogflow messenger to the body
       document.body.appendChild(dfMessenger);
