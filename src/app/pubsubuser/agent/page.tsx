@@ -18,8 +18,9 @@ export default function AgentChatPage() {
 
   // Use effect to safely access localStorage only on the client side
   useEffect(() => {
-    const agentEmailFromStorage = localStorage.getItem('agent_email');
-    const roleFromStorage = localStorage.getItem('role');
+    const userInfo = JSON.parse(localStorage.getItem('user') || '{}');
+    const agentEmailFromStorage = userInfo.email;
+    const roleFromStorage = userInfo.role;
 
     if (agentEmailFromStorage) {
       setAgentEmail(agentEmailFromStorage);
