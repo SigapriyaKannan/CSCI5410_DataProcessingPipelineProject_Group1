@@ -16,7 +16,7 @@ build-job:
   - gcloud auth activate-service-account --key-file /tmp/gcloud-service-key.json
   - gcloud config set project $GCP_PROJECT_ID
   - gcloud builds submit . --config=cloudbuild.yaml
-  - echo "Application successfully deployed."
+  - echo "Docker image build pushed to GCR."
   after_script:
   - rm /tmp/gcloud-service-key.json
   only:
