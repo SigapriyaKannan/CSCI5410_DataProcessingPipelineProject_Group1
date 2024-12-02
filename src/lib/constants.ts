@@ -1,5 +1,5 @@
 export const auth_api: string =
-  process.env.NEXT_PUBLIC_AUTH_API ?? "https://jzi33rv5fg.execute-api.us-east-1.amazonaws.com/Dev";  process.env.NEXT_PUBLIC_AUTH_API ?? ;
+  process.env.NEXT_PUBLIC_AUTH_API ?? "https://jzi33rv5fg.execute-api.us-east-1.amazonaws.com/Dev"; 
 
 export const log_api: string =
   process.env.NEXT_PUBLIC_LOG_API ?? "https://us-central1-k8s-assignment-csci5409.cloudfunctions.net";
