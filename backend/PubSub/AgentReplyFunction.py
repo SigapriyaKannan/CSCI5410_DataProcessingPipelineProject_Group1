@@ -1,42 +1,51 @@
 from google.cloud import firestore
 import json
 
-# Firestore client
 db = firestore.Client()
 
 def agent_reply(request):
-    """Endpoint for agent to reply to a conversation."""
     try:
-        # Parse incoming JSON request
+        if request.method == 'OPTIONS':
+            headers = {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type",
+            }
+            print(f"Preflight CORS headers: {headers}")
+            return ('', 204, headers)
+
+        headers = {
+            "Access-Control-Allow-Origin": "*"
+        }
+        print(f"Response CORS headers: {headers}")
+
         request_json = request.get_json()
         if not request_json:
-            return json.dumps({'error': 'Invalid request, missing JSON body'}), 400
+            print("Error: Missing request body")
+            return json.dumps({"error": "Invalid request, missing JSON body"}), 400, headers
 
         agent_email = request_json.get('agent_email')
+        process_code = request_json.get('process_code')
         message = request_json.get('message')
 
-        # Validate input fields
-        if not all([agent_email, message]):
-            return json.dumps({'error': 'Missing required fields'}), 400
+        print(f"Received data - agent_email: {agent_email}, process_code: {process_code}, message: {message}")
 
-        # Find the active conversation where the agent is assigned
-        print(f"Fetching active conversation for agent: {agent_email}")
-        conversation_ref = db.collection('conversations').where('assigned_agent', '==', agent_email).limit(1).stream()
+        if not all([agent_email, process_code, message]):
+            print("Error: Missing required fields")
+            return json.dumps({"error": "Missing required fields"}), 400, headers
 
-        # If there’s no active conversation for this agent, return an error
-        conversation = None
-        for conv in conversation_ref:
-            conversation = conv.to_dict()
-            break
+        conversation_ref = db.collection('conversations').document(process_code)
+        conversation_doc = conversation_ref.get()
 
-        if not conversation:
-            return json.dumps({'error': 'No active conversation found for the agent'}), 404
+        if not conversation_doc.exists:
+            print(f"Error: Conversation not found for process_code: {process_code}")
+            return json.dumps({"error": "Conversation not found for the provided process_code"}), 404, headers
 
-        # The user email is fetched from the conversation data
-        user_email = conversation['user_email']
+        conversation_data = conversation_doc.to_dict()
+        if conversation_data.get("assigned_agent") != agent_email:
+            print(f"Error: Agent {agent_email} not assigned to this conversation")
+            return json.dumps({"error": "Agent is not assigned to this conversation"}), 403, headers
 
-        # Append the agent's reply to the conversation's messages (without timestamp)
-        conversation_ref = db.collection("conversations").document(user_email)
         conversation_ref.update({
             "messages": firestore.ArrayUnion([{
                 "sender": "agent",
@@ -45,7 +54,16 @@ def agent_reply(request):
             }])
         })
 
-        return json.dumps({'message': 'Agent reply successfully added'}), 200
+        updated_conversation_doc = conversation_ref.get()
+        updated_conversation_data = updated_conversation_doc.to_dict()
+        messages = updated_conversation_data.get("messages", [])
+
+        print(f"Agent reply added successfully for process_code: {process_code}")
+
+        return json.dumps({
+            "message": "Agent reply successfully added"
+        }), 200, headers
 
     except Exception as e:
-        return json.dumps({'error': str(e)}), 500
+        print(f"Error: {str(e)}")
+        return json.dumps({"error": str(e)}), 500, headers

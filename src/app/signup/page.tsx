@@ -19,7 +19,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { auth_api } from "@/lib/constants";
+import {
+  auth_api,
+  register_started_email,
+  register_success_email,
+} from "@/lib/constants";
 import { security_questions_type, signup_request_type } from "../types/auth";
 import { useRouter } from "next/navigation";
 import { toast } from "@/hooks/use-toast";
@@ -94,8 +98,8 @@ export default function SignupPage() {
           body: JSON.stringify(signupRequestData),
         });
 
-        if (!response.ok) {
-          const result = await response.json();
+        const result = await response.json();
+        if (result?.status !== "Success") {
           setError(result.error || "Signup failed.");
           setLoading(false);
           toast({
@@ -104,6 +108,18 @@ export default function SignupPage() {
           });
           return;
         }
+
+        const register_started_response = await fetch(`${auth_api}/api/sns`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: formData.email,
+            subject: register_started_email.subject,
+            message: register_started_email.message,
+          }),
+        });
 
         toast({
           title: "Registration success",
@@ -130,8 +146,8 @@ export default function SignupPage() {
           },
         );
 
-        if (!response.ok) {
-          const result = await response.json();
+        const result = await response.json();
+        if (result?.status !== "Success") {
           setError(result.error || "Failed to save security questions.");
           setLoading(false);
           toast({
@@ -149,14 +165,13 @@ export default function SignupPage() {
           body: JSON.stringify({ email: formData.email }),
         });
 
-        if (!mathResponse.ok) {
-          const result = await mathResponse.json();
-          setError(result.error || "Failed to retrieve math question.");
+        const mathResult = await mathResponse.json();
+        if (mathResult?.status !== "Success") {
+          setError(mathResult.error || "Failed to retrieve math question.");
           setLoading(false);
           return;
         }
 
-        const mathResult = await mathResponse.json();
         setMathOperand1(mathResult.operands[0]);
         setMathOperand2(mathResult.operands[1]);
         setAnswerToBe(mathResult.answer);
@@ -199,8 +214,8 @@ export default function SignupPage() {
           }),
         });
 
-        if (!response.ok) {
-          const result = await response.json();
+        const result = await response.json();
+        if (result?.status !== "Success") {
           setError(result.error || "Signup confirmation failed.");
           setLoading(false);
           toast({
@@ -209,6 +224,18 @@ export default function SignupPage() {
           });
           return;
         }
+
+        const register_success_response = await fetch(`${auth_api}/api/sns`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            email: formData.email,
+            subject: register_success_email.subject,
+            message: register_success_email.message,
+          }),
+        });
 
         toast({
           title: "Signup successful",

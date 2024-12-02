@@ -12,30 +12,25 @@ from pyspark.sql import SparkSession
 from pyspark.sql.functions import *
 from pyspark.sql.types import *
 
-# Get job arguments
 args = getResolvedOptions(sys.argv, ['JOB_NAME', 's3_input_key', 'dynamodb_table_name', 'bucket_name', 'user_email',
                                      'new_bucket_name', 'process_code'])
 print("Job Name: ", args['JOB_NAME'])
 
-# Initialize Spark and Glue contexts
 sc = SparkContext.getOrCreate()
 glueContext = GlueContext(sc)
 spark = glueContext.spark_session
 job = Job(glueContext)
 job.init(args['JOB_NAME'], args)
 
-# AWS S3 and DynamoDB Connection setup
 s3 = boto3.client('s3')
 dynamodb = boto3.resource('dynamodb')
 table = dynamodb.Table(args['dynamodb_table_name'])
 print("AWS S3 and DynamoDB Connection established")
 
-# Get the S3 input key and bucket name from job arguments
 s3_input_key = args['s3_input_key']
 bucket_name = args['bucket_name']
 file_path = f"s3://{bucket_name}/{s3_input_key}"
 
-# Read the input JSON file from S3
 df = spark.read.option("multiline", "true").json(file_path)
 
 
@@ -50,7 +45,6 @@ def get_original_column_order(bucket_name, s3_input_key):
         raise ValueError("Unexpected JSON format in the input file")
 
 
-# Function to check if the DataFrame is flattened
 def is_flattened(df):
     for field in df.schema.fields:
         if isinstance(field.dataType, (StructType, ArrayType, MapType)):
@@ -58,7 +52,6 @@ def is_flattened(df):
     return True
 
 
-# Function to flatten the JSON DataFrame
 def flatten_json(df):
     while not is_flattened(df):
         columns_to_process = 2
@@ -101,30 +94,43 @@ if is_flattened(df):
 else:
     df = flatten_json(df)
 
-# flattened data write as CSV to S3
 new_bucket_name = args['new_bucket_name']
 process_code = args['process_code']
 csv_filename = s3_input_key.replace('.json', '.csv')
-output_path = f"s3://{new_bucket_name}/output/{csv_filename}"
-df.write.mode("overwrite").option("header", "true").csv(output_path)
+temp_output_path = f"s3://{new_bucket_name}/temp/"
+final_output_path = f"s3://{new_bucket_name}/{csv_filename}"
 
-# Introduce a delay to account for writing the CSV to S3
+df.coalesce(1).write.mode("overwrite").option("header", "true").csv(temp_output_path)
+
 time.sleep(60)
 
-# Read the CSV back to extract metadata
-csv_df = spark.read.option("header", "true").csv(output_path)
+response = s3.list_objects_v2(Bucket=new_bucket_name, Prefix="temp/")
+
+for obj in response.get('Contents', []):
+    key = obj['Key']
+    if key.endswith('.csv'):
+        copy_source = {'Bucket': new_bucket_name, 'Key': key}
+        s3.copy_object(CopySource=copy_source, Bucket=new_bucket_name, Key=csv_filename)
+
+        s3.delete_object(Bucket=new_bucket_name, Key=key)
+
+s3.delete_object(Bucket=new_bucket_name, Key="temp/")
+
+region = boto3.session.Session().region_name
+public_url = f"https://{new_bucket_name}.s3.{region}.amazonaws.com/{csv_filename}"
+
+csv_df = spark.read.option("header", "true").csv(final_output_path)
 row_count = csv_df.count()
 column_list = csv_df.columns
 schema_types = [(field.name, str(field.dataType)) for field in csv_df.schema.fields]
 
-# Save metadata and job status in DynamoDB
 job_status = "SUCCEEDED"
 table.put_item(
     Item={
-        'user_email': args['user_email'],  # Partition key
+        'user_email': args['user_email'],
         'processed_file_name': csv_filename,
         'S3JsonFilePath': file_path,
-        'S3CsvFilePath': output_path,
+        'S3CsvFilePath': public_url,
         'JobStatus': job_status,
         'RowCount': row_count,
         'Columns': column_list,
@@ -136,5 +142,4 @@ table.put_item(
 print(
     f"Metadata saved to DynamoDB for {s3_input_key}: Status - {job_status}, Rows - {row_count}, Columns - {column_list}")
 
-# Glue job Completion
 job.commit()

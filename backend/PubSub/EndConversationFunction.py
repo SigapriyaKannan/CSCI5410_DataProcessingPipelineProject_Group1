@@ -1,79 +1,85 @@
 from google.cloud import firestore
 import json
 
-# Firestore client
 db = firestore.Client()
 
-
 def end_conversation(request):
-    """Endpoint to end a conversation based on user or agent request."""
     try:
-        # Parse incoming JSON request
+        print(f"Received request: {request}")
+        print(f"Request method: {request.method}")
+        print(f"Request headers: {request.headers}")
+
+        if request.method == 'OPTIONS':
+            headers = {
+                "Access-Control-Allow-Origin": "*",
+                "Access-Control-Allow-Methods": "POST, OPTIONS",
+                "Access-Control-Allow-Headers": "Content-Type",
+            }
+            print(f"Preflight CORS headers: {headers}")
+            return ('', 204, headers)
+
+        headers = {
+            "Access-Control-Allow-Origin": "*",
+        }
+        print(f"Response CORS headers: {headers}")
+
         request_json = request.get_json()
         if not request_json:
-            return json.dumps({'error': 'Invalid request, missing JSON body'}), 400
+            print("Error: Missing JSON body")
+            return json.dumps({'error': 'Invalid request, missing JSON body'}), 400, headers
 
-        agent_email = request_json.get('agent_email')  # Agent's email (if agent is triggering)
-        user_email = request_json.get('user_email')  # User's email (for user-triggered requests)
-        role = request_json.get('role')  # Role of the user or agent (agent/user)
-        status = request_json.get('status')  # "resolved" or "closed" (for agent)
+        process_code = request_json.get('process_code')
+        role = request_json.get('role')
+        status = request_json.get('status')
 
-        # Validate input fields
-        if not all([role, agent_email or user_email]):
-            return json.dumps({'error': 'Missing required fields: role and either agent_email or user_email'}), 400
+        print(f"Parsed data - process_code: {process_code}, role: {role}, status: {status}")
 
-        # If triggered by the agent
-        if role == "agent" and agent_email:
-            if not status or status not in ['yes', 'no']:
-                return json.dumps({'error': 'If role is agent, "status" is required with value "yes" or "no".'}), 400
+        if not all([process_code, role, status]):
+            print("Error: Missing required fields")
+            return json.dumps({'error': 'Missing required fields: process_code, role, and status'}), 400, headers
 
-            # Fetch the active conversation where the agent is assigned
-            conversation_ref = db.collection('conversations').where('assigned_agent', '==', agent_email).limit(
-                1).stream()
-            conversation = None
-            for conv in conversation_ref:
-                conversation = conv.to_dict()
-                conversation_document_ref = conv.reference  # Get the document reference
-                break
+        if status not in ["yes", "no"]:
+            print("Error: Invalid status value")
+            return json.dumps({'error': 'Invalid status value. It should be "yes" or "no".'}), 400, headers
 
-            if not conversation:
-                return json.dumps({'error': 'No active conversation found for the provided agent_email'}), 404
+        conversation_ref = db.collection('conversations').document(process_code)
+        conversation_doc = conversation_ref.get()
 
-            # Fetch the user email from the conversation
-            user_email = conversation['user_email']
+        if not conversation_doc.exists:
+            print(f"Error: Conversation not found for process_code: {process_code}")  # Debugging statement
+            return json.dumps({'error': 'Conversation not found for the provided process_code'}), 404, headers
 
-            # Mark as resolved and unassign agent if status is 'yes'
-            if status == 'yes':
-                conversation_document_ref.update({
-                    "status": "resolved",  # Mark conversation as resolved
-                    "assigned_agent": None,  # Unassign the agent
+
+        if role == "agent":
+            if status == "yes":
+                print(f"Marking conversation as resolved and deleting for process_code: {process_code}")
+                conversation_ref.update({
+                    "assigned_agent": None,
+                    "status": "resolved"
                 })
-                return json.dumps({'message': 'Conversation marked as resolved and agent unassigned.'}), 200
+                conversation_ref.delete()
+                return json.dumps({'message': 'Conversation resolved, agent unassigned, and conversation deleted.'}), 200, headers
+            elif status == "no":
+                print(f"Conversation not resolved. Agent remains assigned for process_code: {process_code}")
+                return json.dumps({'message': 'Conversation not resolved. Agent remains assigned.'}), 200, headers
 
-            elif status == 'no':
-                return json.dumps({'message': 'Conversation is not yet resolved. Agent remains assigned.'}), 200
+        elif role == "user":
+            if status == "yes":
+                print(f"Closing conversation and deleting for process_code: {process_code}")
+                conversation_ref.update({
+                    "status": "closed",
+                    "assigned_agent": None
+                })
+                conversation_ref.delete()
+                return json.dumps({'message': 'Conversation successfully closed and agent unassigned.'}), 200, headers
+            elif status == "no":
+                print(f"Conversation remains open for process_code: {process_code}")
+                return json.dumps({'message': 'Conversation remains open.'}), 200, headers
 
-        # If triggered by the user
-        if role == "user" and user_email:
-            # Fetch the conversation for the user
-            conversation_ref = db.collection('conversations').document(user_email)
-            conversation_doc = conversation_ref.get()
-
-            if not conversation_doc.exists:
-                return json.dumps({'error': 'Conversation not found for the provided user_email'}), 404
-
-            conversation_data = conversation_doc.to_dict()
-
-            # Mark as closed and unassign the agent
-            conversation_ref.update({
-                "status": "closed",  # Mark conversation as closed
-                "assigned_agent": None,  # Unassign the agent
-            })
-
-            return json.dumps({'message': 'Conversation successfully ended and agent unassigned.'}), 200
-
-        # If the role is neither agent nor user, return an error
-        return json.dumps({'error': 'Invalid role. Expected "agent" or "user".'}), 400
+        print("Error: Invalid role")
+        return json.dumps({'error': 'Invalid role. Expected "agent" or "user".'}), 400, headers
 
     except Exception as e:
-        return json.dumps({'error': str(e)}), 500
+        error_message = f"Error occurred: {str(e)}"
+        print(error_message)
+        return json.dumps({'error': error_message}), 500, headers
