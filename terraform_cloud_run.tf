@@ -48,6 +48,9 @@ resource "google_cloud_run_service" "app" {
   }
 
   autogenerate_revision_name = true
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # Allow unauthenticated requests
