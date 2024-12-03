@@ -6,13 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2 } from 'lucide-react';
 import { FileHistory } from '@/components/file-history-dp3';
-import { FeedbackTable } from '@/components/feedback-table';
-import { FeedbackDialog } from '@/components/feedback-dialog';
 import { UserContext } from '@/app/contexts/user-context';
+
 interface FileDetails {
   fileName: string;
   referenceId: string;
-  fileSize: string,
+  fileSize: string;
   timestamp: string;
   status: string;
   url: string;
@@ -32,9 +31,7 @@ export default function FileUploadPage() {
         const userInfo = JSON.parse(localStorage.getItem('user') || '{}');
         const email = userInfo.email;
 
-        const getAllJobsRequest = {
-          user_email: email,
-        };
+        const getAllJobsRequest = { user_email: email };
 
         const response = await fetch(
           `https://cp4fm5iznqaqvnk6vkmwleqqcq0vadfs.lambda-url.us-east-1.on.aws/`,
@@ -50,26 +47,30 @@ export default function FileUploadPage() {
         if (response.ok) {
           const data = await response.json();
 
-          // Map API response to match the FileDetails type
-          const formattedFiles = data.map((file: any): FileDetails => ({
-            fileName: file.filename,
-            referenceId: file.process_code ?? '-',
-            timestamp: file.Timestamp
-              ? new Date(file.Timestamp * 1000).toISOString()
-              : '-',
-            url: file.Url ?? '-',
-            status: "SUCCEEDED",
-            fileSize: file.file_size?.toString() ?? '-',
-          }));
+          // Ensure the response is an array and contains the expected fields
+          if (Array.isArray(data)) {
+            const formattedFiles = data.map((file: any): FileDetails => ({
+              fileName: file.filename ?? 'Unknown',
+              referenceId: file.process_code ?? '-',
+              timestamp: file.Timestamp
+                ? new Date(file.Timestamp * 1000).toISOString()
+                : '-',
+              url: file.Url ?? '-',
+              status: file.status ?? 'UNKNOWN', // Ensure 'status' is available
+              fileSize: file.file_size ? file.file_size.toString() : '-',
+            }));
 
-          console.log(formattedFiles);
-          // Sort by timestamp in descending order
-          formattedFiles.sort(
-            (a: any, b: any) =>
-              new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-          );
+            // Sort by timestamp (fallback in case timestamp is missing or invalid)
+            formattedFiles.sort((a, b) => {
+              const timestampA = new Date(a.timestamp).getTime();
+              const timestampB = new Date(b.timestamp).getTime();
+              return timestampB - timestampA; // Sort in descending order
+            });
 
-          setFileHistory(formattedFiles);
+            setFileHistory(formattedFiles);
+          } else {
+            console.warn('Expected an array in the response, but got:', data);
+          }
         } else {
           console.error('Error fetching file history:', await response.text());
         }
@@ -126,15 +127,30 @@ export default function FileUploadPage() {
         const updatedFile = await response.json();
 
         const formattedFile: FileDetails = {
-          fileName: '-',
+          fileName: file.name ?? '-',
           referenceId: updatedFile.process_code ?? '-',
           timestamp: new Date().toISOString(),
-          url: '-',
-          fileSize: '-',
+          url: '-', // Can be updated after processing
+          fileSize: file.size ? file.size.toString() : '-',
           status: 'PROCESSING',
         };
 
         setFileHistory((prev) => [formattedFile, ...prev]);
+
+        const emailRequest = {
+          email: userInfo.email,
+          message: `Your file with reference ID ${updatedFile.process_code} has been successfully processed.`,
+          subject: 'File Processing Success',
+        };
+
+        await fetch('https://4felas5im2setdsipr3dryjdhi0jeauv.lambda-url.us-east-1.on.aws/', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(emailRequest),
+        });
+
       } else {
         console.error('Error uploading file:', await response.text());
       }
@@ -213,10 +229,6 @@ export default function FileUploadPage() {
 
         {/* File History Section */}
         <FileHistory files={fileHistory} />
-
-        {/* Feedback Section */}
-        <FeedbackTable feature="dp3" />
-        { user && user.role === "Registered" && <FeedbackDialog feature="dp3" />}
       </div>
     </div>
   );
