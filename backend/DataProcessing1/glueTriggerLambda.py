@@ -4,15 +4,12 @@ import os
 import time
 from botocore.exceptions import ClientError
 
-# Initialize AWS clients
 glue_client = boto3.client('glue')
 dynamodb = boto3.resource('dynamodb')
 
-# Get environment variables
 dynamodb_table_name = os.environ['DYNAMODB_TABLE_NAME']
 glue_job_name = os.environ['GLUE_JOB_NAME']
 
-# Global variable to store user email
 user_email = None
 process_code = None
 
@@ -23,18 +20,15 @@ def lambda_handler(event, context):
     print("Received event:", json.dumps(event, indent=2))
 
     try:
-        # Extract details from the event
         s3_key = event['s3_input_key']
-        user_email = event['user_email']  # Assign the email globally
-        role = event.get('role', 'guest')  # Default role
+        user_email = event['user_email']
+        role = event.get('role', 'guest')
         process_code = event['process_code']
 
         print(f"Starting Glue job with Job ID: {process_code}, User: {user_email}, Role: {role}")
 
-        # Save the initial RUNNING status in DynamoDB
         save_initial_status_to_dynamodb(process_code, s3_key)
 
-        # Start the Glue job
         response = glue_client.start_job_run(
             JobName=glue_job_name,
             Arguments={
@@ -50,13 +44,10 @@ def lambda_handler(event, context):
         job_run_id = response['JobRunId']
         print(f"Started Glue job {glue_job_name}: {job_run_id}")
 
-        # Update DynamoDB with the Glue JobRunId
         update_job_run_id_in_dynamodb(process_code, job_run_id)
 
-        # Poll the Glue job status until it finishes or times out
         job_status = monitor_glue_job(glue_job_name, job_run_id)
 
-        # Update the final job status in DynamoDB
         update_job_status_in_dynamodb(process_code, job_status)
 
         return {
@@ -75,10 +66,8 @@ def lambda_handler(event, context):
         }
 
 def save_initial_status_to_dynamodb(process_code, s3_key):
-    """
-    Save the initial job metadata and status to DynamoDB.
-    """
-    global user_email  # Use global email
+
+    global user_email
     table = dynamodb.Table(dynamodb_table_name)
     try:
         table.put_item(
@@ -95,10 +84,8 @@ def save_initial_status_to_dynamodb(process_code, s3_key):
         print(f"Error saving initial status to DynamoDB: {e.response['Error']['Message']}")
 
 def update_job_run_id_in_dynamodb(process_code, job_run_id):
-    """
-    Update the Glue JobRunId in DynamoDB.
-    """
-    global user_email  # Use global email
+
+    global user_email
     table = dynamodb.Table(dynamodb_table_name)
     try:
         table.update_item(
@@ -113,11 +100,9 @@ def update_job_run_id_in_dynamodb(process_code, job_run_id):
         print(f"Error updating JobRunId in DynamoDB: {e.response['Error']['Message']}")
 
 def monitor_glue_job(glue_job_name, job_run_id):
-    """
-    Monitor the Glue job status for up to 10 minutes (600 seconds).
-    """
-    timeout = 600  # Timeout in seconds
-    interval = 60  # Poll every 60 seconds
+
+    timeout = 600
+    interval = 60
 
     for _ in range(timeout // interval):
         job_run = glue_client.get_job_run(JobName=glue_job_name, RunId=job_run_id)
@@ -128,15 +113,12 @@ def monitor_glue_job(glue_job_name, job_run_id):
             return job_status
         time.sleep(interval)
 
-    # If timeout is reached, return a timeout status
     print(f"Glue job {glue_job_name} timed out.")
     return 'TIMEOUT'
 
 def update_job_status_in_dynamodb(process_code, final_status):
-    """
-    Update the final Glue job status in DynamoDB.
-    """
-    global user_email  # Use global email
+
+    global user_email
     table = dynamodb.Table(dynamodb_table_name)
     try:
         table.update_item(

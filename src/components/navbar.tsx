@@ -20,6 +20,8 @@ export default function Navbar() {
     { name: "DP1", href: "/dataprocessing/1" },
     { name: "DP2", href: "/dataprocessing/2" },
     { name: "DP3", href: "/dataprocessing/3" },
+    { name: "User Chat Window", href: "/pubsubuser/user" },
+    { name: "Agent Chat Window", href: "/pubsubuser/agent" },
   ];
 
   if (user && user.role === "Agent") {

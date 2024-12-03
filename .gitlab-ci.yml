@@ -1,18 +1,42 @@
-stages:          # List of stages for jobs, and their order of execution
-  - deploy
- 
-deploy-job:     
-  stage: deploy
+image:
+  name: hashicorp/terraform:1.3.2
+  entrypoint:
+  - "/usr/bin/env"
+  - "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+
+stages:
+- build
+- deploy
+
+build-job:
+  stage: build
   image: google/cloud-sdk:alpine
   script:
-    - echo $GCP_KEY > /tmp/gcloud-service-key.json
-    - gcloud auth activate-service-account --key-file /tmp/gcloud-service-key.json
-    - gcloud config set project $GCP_PROJECT_ID
-    - gcloud builds submit . --config=cloudbuild.yaml
-    - echo "Application successfully deployed."
+  - echo $GCP_KEY > /tmp/gcloud-service-key.json
+  - gcloud auth activate-service-account --key-file /tmp/gcloud-service-key.json
+  - gcloud config set project $GCP_PROJECT_ID
+  - gcloud builds submit . --config=cloudbuild.yaml
+  - echo "Docker image build pushed to GCR."
+  after_script:
+  - rm /tmp/gcloud-service-key.json
   only:
+    refs:
     - main
     - develop
- 
-after_script:
-    - rm /tmp/gcloud-service-key.json
+    changes:
+    - src/**/*
+
+deploy-job:
+  stage: deploy
+  before_script:
+  - cp $GCP_KEY_FILE /tmp/credentials.json
+  - export GOOGLE_APPLICATION_CREDENTIALS="/tmp/credentials.json"
+  - terraform init
+  script:
+  - terraform destroy -auto-approve -var="project_id=$GCP_PROJECT_ID" -var="region=us-central1" -var="image=gcr.io/$GCP_PROJECT_ID/serverless/next-frontend:latest"
+  - terraform apply -auto-approve -var="project_id=$GCP_PROJECT_ID" -var="region=us-central1" -var="image=gcr.io/$GCP_PROJECT_ID/serverless/next-frontend:latest"
+  after_script:
+  - rm -f /tmp/gcloud-service-key.json
+  only:
+  - main
+  - develop

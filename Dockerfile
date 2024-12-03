@@ -11,6 +11,10 @@ RUN pnpm install
 
 COPY . .
 
+ENV NEXT_PUBLIC_AUTH_API=""
+
+ENV NEXT_PUBLIC_LOG_API=""
+
 EXPOSE 3000
 
 RUN pnpm build
