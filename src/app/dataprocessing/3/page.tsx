@@ -7,6 +7,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Loader2 } from 'lucide-react';
 import { FileHistory } from '@/components/file-history-dp3';
 import { UserContext } from '@/app/contexts/user-context';
+import { FeedbackDialog } from '@/components/feedback-dialog';
+import { FeedbackTable } from '@/components/feedback-table';
 
 interface FileDetails {
   fileName: string;
@@ -229,6 +231,10 @@ export default function FileUploadPage() {
 
         {/* File History Section */}
         <FileHistory files={fileHistory} />
+
+        {/* Feedback Section */}
+        <FeedbackTable feature="dp1" />
+        { user && user.role === "Registered" && <FeedbackDialog feature="dp1" />}
       </div>
     </div>
   );
