@@ -7,9 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Loader2 } from 'lucide-react';
 import { FileHistory } from '@/components/file-history-dp2';
 import { auth_api } from "@/lib/constants";
-import { FeedbackTable } from '@/components/feedback-table';
 import { UserContext } from '@/app/contexts/user-context';
-import { FeedbackDialog } from '@/components/feedback-dialog';
 
 interface FileDetails {
   referenceId: string;
@@ -23,6 +21,7 @@ export default function FileUploadPage() {
   const [fileHistory, setFileHistory] = useState<FileDetails[]>([]);
   const [isFetching, setIsFetching] = useState(true);
   const { user } = useContext(UserContext);
+
   // Fetch file history
   useEffect(() => {
     const fetchFileHistory = async () => {
@@ -30,9 +29,7 @@ export default function FileUploadPage() {
         const userInfo = JSON.parse(localStorage.getItem('user') || '{}');
         const email = userInfo.email;
 
-        const getAllJobsRequest = {
-          email: email,
-        };
+        const getAllJobsRequest = { user_email: email };
 
         const response = await fetch(
           `https://q3mhoyo8i9.execute-api.us-east-1.amazonaws.com/prod/nerprocess/retrieve-files`,
@@ -47,21 +44,19 @@ export default function FileUploadPage() {
 
         if (response.ok) {
           const data = await response.json();
-          
-          // Map API response to match the FileDetails type
-          const formattedFiles = data.file_locations.map((file: any): FileDetails => ({
-            referenceId: file.reference_code ?? '-',
-            txtFileLink: file.processed_file_s3_location ?? '-',
-            status: file.job_status ?? '-',
-          }));
 
-          // Sort by timestamp in descending order
-          formattedFiles.sort(
-            (a: any, b: any) =>
-              new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-          );
+          // Ensure file_locations exists and is an array
+          if (Array.isArray(data.file_locations)) {
+            const formattedFiles = data.file_locations.map((file: any): FileDetails => ({
+              referenceId: file.reference_code ?? '-',
+              txtFileLink: file.processed_file_s3_location ?? '-',
+              status: file.job_status ?? '-',
+            }));
 
-          setFileHistory(formattedFiles);
+            setFileHistory(formattedFiles);
+          } else {
+            console.warn('Expected file_locations to be an array, but received:', data.file_locations);
+          }
         } else {
           console.error('Error fetching file history:', await response.text());
         }
@@ -121,6 +116,10 @@ export default function FileUploadPage() {
           status: updatedFile.job_status ?? '-',
         };
 
+        if (updatedFile.job_status === 'SUCCEEDED') {
+          await sendEmailToUser(updatedFile);
+        }
+
         setFileHistory((prev) => [formattedFile, ...prev]);
       } else {
         console.error('Error uploading file:', await response.text());
@@ -130,6 +129,39 @@ export default function FileUploadPage() {
     } finally {
       setIsLoading(false);
       setFile(null);
+    }
+  };
+
+  const sendEmailToUser = async (fileDetails: any) => {
+    try {
+      const emailPayload = {
+        email: user?.email,
+        subject: 'File Processing Completed',
+        message: `Your file has been successfully processed. Details:
+
+        Reference Code: ${fileDetails.reference_code}
+        Processed File: ${fileDetails.processed_file_s3_location}
+        Status: ${fileDetails.job_status}`,
+      };
+
+      const emailResponse = await fetch(
+        `https://4felas5im2setdsipr3dryjdhi0jeauv.lambda-url.us-east-1.on.aws/`,
+        {
+          method: 'POST',
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(emailPayload),
+        }
+      );
+
+      if (emailResponse.ok) {
+        console.log('Email sent successfully');
+      } else {
+        console.error('Error sending email:', await emailResponse.text());
+      }
+    } catch (error) {
+      console.error('Error:', error);
     }
   };
 
@@ -200,10 +232,6 @@ export default function FileUploadPage() {
 
         {/* File History Section */}
         <FileHistory files={fileHistory} />
-
-        {/* Feedback Section */}
-        <FeedbackTable feature="dp2" />
-        { user && user.role === "Registered" && <FeedbackDialog feature="dp2" />}
       </div>
     </div>
   );

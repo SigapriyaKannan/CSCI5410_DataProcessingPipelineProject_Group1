@@ -6,8 +6,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2 } from 'lucide-react';
 import { FileHistory } from '@/components/file-history-dp1';
-import { FeedbackDialog } from '@/components/feedback-dialog';
-import { FeedbackTable } from '@/components/feedback-table';
 import { auth_api } from "@/lib/constants";
 import { UserContext } from "@/app/contexts/user-context";
 
@@ -51,26 +49,28 @@ export default function FileUploadPage() {
 
         if (response.ok) {
           const data = await response.json();
+          if (Array.isArray(data)) {
+            const formattedFiles = data.map((file: any): FileDetails => ({
+              fileName: file.filename ?? '-', // Ensure fileName exists
+              referenceId: file.process_code ?? '-', // Fallback if process_code is missing
+              timestamp: file.Timestamp
+                ? new Date(file.Timestamp * 1000).toISOString()
+                : '-', // Handle missing Timestamp
+              txtFileLink: file.ProcessedFile ?? '-', // Ensure ProcessedFile is available
+              rowCount: file.RowCount ? file.RowCount.toString() : '-', // Safely handle RowCount
+              status: file.JobStatus ?? 'UNKNOWN', // Default to 'UNKNOWN' if JobStatus is missing
+            }));
 
-          // Map API response to match the FileDetails type
-          const formattedFiles = data.map((file: any): FileDetails => ({
-            fileName: '-',
-            referenceId: file.process_code ?? '-',
-            timestamp: file.Timestamp
-              ? new Date(file.Timestamp * 1000).toISOString()
-              : '-',
-            txtFileLink: file.ProcessedFile ?? '-',
-            rowCount: file.RowCount?.toString() ?? '-',
-            status: file.JobStatus ?? '-',
-          }));
+            // Sort by timestamp in descending order
+            formattedFiles.sort(
+              (a: FileDetails, b: FileDetails) =>
+                new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+            );
 
-          // Sort by timestamp in descending order
-          formattedFiles.sort(
-            (a: any, b: any) =>
-              new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-          );
-
-          setFileHistory(formattedFiles);
+            setFileHistory(formattedFiles);
+          } else {
+            console.warn("Expected an array, but got:", data);
+          }
         } else {
           console.error('Error fetching file history:', await response.text());
         }
@@ -130,11 +130,11 @@ export default function FileUploadPage() {
         const updatedFile = await response.json();
 
         const formattedFile: FileDetails = {
-          fileName: '-',
+          fileName: updatedFile.filename ?? '-',
           referenceId: updatedFile.process_code ?? '-',
           timestamp: new Date().toISOString(),
           txtFileLink: updatedFile.ProcessedFile ?? '-',
-          rowCount: updatedFile.RowCount?.toString() ?? '-',
+          rowCount: updatedFile.RowCount ? updatedFile.RowCount.toString() : '-',
           status: 'Running',
         };
 
@@ -217,10 +217,6 @@ export default function FileUploadPage() {
 
         {/* File History Section */}
         <FileHistory files={fileHistory} />
-
-        {/* Feedback Section */}
-        <FeedbackTable feature="dp1" />
-        { user && user.role === "Registered" && <FeedbackDialog feature="dp1" />}
       </div>
     </div>
   );
